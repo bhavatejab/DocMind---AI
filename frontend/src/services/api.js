@@ -2,7 +2,6 @@ const API_URL = "https://docmind-ai-production-ca68.up.railway.app";
 
 export async function uploadPDF(file) {
   const formData = new FormData();
-
   formData.append("file", file);
 
   const response = await fetch(`${API_URL}/upload`, {
@@ -10,11 +9,17 @@ export async function uploadPDF(file) {
     body: formData,
   });
 
+  console.log("Status:", response.status);
+
+  const text = await response.text();
+
+  console.log("Raw Response:", text);
+
   if (!response.ok) {
-    throw new Error("Failed to upload PDF");
+    throw new Error(text);
   }
 
-  return await response.json();
+  return JSON.parse(text);
 }
 
 export async function askQuestion(question) {
@@ -23,14 +28,16 @@ export async function askQuestion(question) {
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      question,
-    }),
+    body: JSON.stringify({ question }),
   });
 
+  const text = await response.text();
+
+  console.log("Chat Response:", text);
+
   if (!response.ok) {
-    throw new Error("Failed to get AI response");
+    throw new Error(text);
   }
 
-  return await response.json();
+  return JSON.parse(text);
 }
