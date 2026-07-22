@@ -1,18 +1,26 @@
 import os
-import pickle
 
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
 
 VECTOR_DB = "vectorstore"
 
-embedding_model = HuggingFaceEmbeddings(
-    model_name="sentence-transformers/all-MiniLM-L6-v2"
-)
+embedding_model = None
+
+
+def get_embedding_model():
+    global embedding_model
+
+    if embedding_model is None:
+        embedding_model = HuggingFaceEmbeddings(
+            model_name="sentence-transformers/all-MiniLM-L6-v2"
+        )
+
+    return embedding_model
 
 
 def create_vector_store(chunks):
-    db = FAISS.from_texts(chunks, embedding_model)
+    db = FAISS.from_texts(chunks, get_embedding_model())
 
     os.makedirs(VECTOR_DB, exist_ok=True)
 
@@ -22,7 +30,7 @@ def create_vector_store(chunks):
 def search_vector_store(query, k=3):
     db = FAISS.load_local(
         VECTOR_DB,
-        embedding_model,
+        get_embedding_model(),
         allow_dangerous_deserialization=True
     )
 
