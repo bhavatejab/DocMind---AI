@@ -1,40 +1,115 @@
-const handleSend = async (question) => {
-  const userMessage = {
-    sender: "user",
-    text: question,
+import { useEffect, useRef, useState } from "react";
+
+import ChatMessage from "./ChatMessage";
+import ChatInput from "./ChatInput";
+import TypingIndicator from "./TypingIndicator";
+
+import { askQuestion } from "../services/api";
+
+const welcomeMessage = {
+  sender: "ai",
+  text:
+    "👋 Welcome to DocMind AI!\n\nI'm your AI-powered study assistant.\n\nYou can chat with me normally or upload a PDF to ask questions, generate summaries, explain concepts, and discover key insights instantly.",
+};
+
+function ChatSection({ newChatTrigger, uploadComplete }) {
+  const [messages, setMessages] = useState([welcomeMessage]);
+  const [loading, setLoading] = useState(false);
+
+  const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({
+      behavior: "smooth",
+    });
+  }, [messages, loading]);
+
+  useEffect(() => {
+    setMessages([welcomeMessage]);
+    setLoading(false);
+  }, [newChatTrigger]);
+
+  const handleSend = async (question) => {
+    const userMessage = {
+      sender: "user",
+      text: question,
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+
+    setLoading(true);
+
+    try {
+      console.log("Sending question:", question);
+
+      const response = await askQuestion(question);
+
+      console.log("Backend response:", response);
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          sender: "ai",
+          text: response.answer,
+          sources: response.sources || [],
+        },
+      ]);
+    } catch (error) {
+      console.error("Chat Error:", error);
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          sender: "ai",
+          text: "❌ Failed to get AI response.",
+          sources: [],
+        },
+      ]);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  setMessages((prev) => [...prev, userMessage]);
+  return (
+    <section className="mt-10">
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h2 className="text-3xl font-bold text-white">
+            DocMind AI
+          </h2>
 
-  setLoading(true);
+          <p className="mt-1 text-slate-400">
+            Chat normally or upload a PDF to ask questions about your document.
+          </p>
+        </div>
+      </div>
 
-  try {
-    console.log("Sending question:", question);
+      <div className="rounded-3xl border border-slate-700 bg-slate-900 shadow-xl">
+        <div className="h-[550px] overflow-y-auto p-8">
+          {messages.map((message, index) => (
+            <ChatMessage
+              key={index}
+              sender={message.sender}
+              text={message.text}
+              sources={message.sources}
+            />
+          ))}
 
-    const response = await askQuestion(question);
+          {loading && <TypingIndicator />}
 
-    console.log("Backend response:", response);
+          <div ref={messagesEndRef} />
+        </div>
 
-    setMessages((prev) => [
-      ...prev,
-      {
-        sender: "ai",
-        text: response.answer,
-        sources: response.sources || [],
-      },
-    ]);
-  } catch (error) {
-    console.error("Chat Error:", error);
+        <div className="border-t border-slate-700 p-6">
+          <ChatInput
+            onSend={handleSend}
+            loading={loading}
+            disabled={false}
+          />
+        </div>
+      </div>
+    </section>
+  );
+}
 
-    setMessages((prev) => [
-      ...prev,
-      {
-        sender: "ai",
-        text: "❌ Failed to get AI response.",
-        sources: [],
-      },
-    ]);
-  } finally {
-    setLoading(false);
-  }
-};
+export default ChatSection;
