@@ -1,0 +1,164 @@
+[1mdiff --git a/backend/app/routes/chat.py b/backend/app/routes/chat.py[m
+[1mindex 8a2d727..20ff3f6 100644[m
+[1m--- a/backend/app/routes/chat.py[m
+[1m+++ b/backend/app/routes/chat.py[m
+[36m@@ -2,7 +2,11 @@[m [mfrom fastapi import APIRouter[m
+ from pydantic import BaseModel[m
+ [m
+ from app.services.vector_store import search_vector_store[m
+[31m-from app.services.gemini_service import ask_gemini[m
+[32m+[m[32mfrom app.services.gemini_service import ([m
+[32m+[m[32m    classify_query,[m
+[32m+[m[32m    general_chat,[m
+[32m+[m[32m    ask_gemini,[m
+[32m+[m[32m)[m
+ [m
+ router = APIRouter()[m
+ [m
+[36m@@ -13,7 +17,27 @@[m [mclass Question(BaseModel):[m
+ [m
+ @router.post("/chat")[m
+ async def chat(data: Question):[m
+[31m-    docs = search_vector_store(data.question)[m
+[32m+[m[32m    question = data.question.strip()[m
+[32m+[m
+[32m+[m[32m    # Step 1: Classify the user's message[m
+[32m+[m[32m    intent = classify_query(question)[m
+[32m+[m
+[32m+[m[32m    print("=" * 60)[m
+[32m+[m[32m    print("Intent:", intent)[m
+[32m+[m[32m    print("=" * 60)[m
+[32m+[m
+[32m+[m[32m    # Step 2: Handle general conversation[m
+[32m+[m[32m    if intent == "GENERAL":[m
+[32m+[m[32m        answer = general_chat(question)[m
+[32m+[m
+[32m+[m[32m        return {[m
+[32m+[m[32m            "question": question,[m
+[32m+[m[32m            "answer": answer,[m
+[32m+[m[32m            "sources": [][m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m    # Step 3: Document Search (RAG)[m
+[32m+[m[32m    docs = search_vector_store(question)[m
+ [m
+     print("=" * 60)[m
+     print("Retrieved Docs:", len(docs))[m
+[36m@@ -24,7 +48,7 @@[m [masync def chat(data: Question):[m
+     print(context[:1000])[m
+     print("=" * 60)[m
+ [m
+[31m-    answer = ask_gemini(data.question, context)[m
+[32m+[m[32m    answer = ask_gemini(question, context)[m
+ [m
+     sources = [][m
+ [m
+[36m@@ -37,7 +61,7 @@[m [masync def chat(data: Question):[m
+         )[m
+ [m
+     return {[m
+[31m-        "question": data.question,[m
+[32m+[m[32m        "question": question,[m
+         "answer": answer,[m
+         "sources": sources[m
+     }[m
+\ No newline at end of file[m
+[1mdiff --git a/backend/app/services/gemini_service.py b/backend/app/services/gemini_service.py[m
+[1mindex a6ad1ef..8a7bbc2 100644[m
+[1m--- a/backend/app/services/gemini_service.py[m
+[1m+++ b/backend/app/services/gemini_service.py[m
+[36m@@ -6,20 +6,80 @@[m [mload_dotenv()[m
+ [m
+ genai.configure(api_key=os.getenv("GEMINI_API_KEY"))[m
+ [m
+[31m-model = model = genai.GenerativeModel("gemini-3.5-flash")[m
+[32m+[m[32mmodel = genai.GenerativeModel("gemini-2.5-flash")[m
+ [m
+ [m
+[31m-def ask_gemini(question, context):[m
+[32m+[m[32mdef classify_query(question: str):[m
+     prompt = f"""[m
+[31m-You are an AI assistant.[m
+[32m+[m[32mYou are an intent classifier.[m
+ [m
+[31m-Answer ONLY using the information provided below.[m
+[32m+[m[32mClassify the user's message into ONLY ONE category.[m
+ [m
+[31m-If the answer is not present in the context, reply:[m
+[32m+[m[32mGENERAL[m
+[32m+[m[32m- Greetings[m
+[32m+[m[32m- Introductions[m
+[32m+[m[32m- Small talk[m
+[32m+[m[32m- Questions about yourself[m
+[32m+[m[32m- Thanks[m
+[32m+[m[32m- Goodbye[m
+[32m+[m[32m- Questions about your capabilities[m
+ [m
+[31m-"I couldn't find the answer in the uploaded document."[m
+[32m+[m[32mDOCUMENT[m
+[32m+[m[32m- Anything asking about the uploaded PDF[m
+[32m+[m[32m- Summaries[m
+[32m+[m[32m- Explanations[m
+[32m+[m[32m- Definitions[m
+[32m+[m[32m- Concepts[m
+[32m+[m[32m- Questions from the document[m
+ [m
+[31m-Context:[m
+[32m+[m[32mReply with ONLY one word:[m
+[32m+[m
+[32m+[m[32mGENERAL[m
+[32m+[m
+[32m+[m[32mor[m
+[32m+[m
+[32m+[m[32mDOCUMENT[m
+[32m+[m
+[32m+[m[32mUser:[m
+[32m+[m[32m{question}[m
+[32m+[m[32m"""[m
+[32m+[m
+[32m+[m[32m    response = model.generate_content(prompt)[m
+[32m+[m[32m    return response.text.strip().upper()[m
+[32m+[m
+[32m+[m
+[32m+[m[32mdef general_chat(question: str):[m
+[32m+[m[32m    prompt = f"""[m
+[32m+[m[32mYou are DocMind AI.[m
+[32m+[m
+[32m+[m[32mDocMind AI is a friendly AI study assistant.[m
+[32m+[m
+[32m+[m[32mYou help students understand PDFs, summarize notes,[m
+[32m+[m[32mexplain concepts, and prepare for exams.[m
+[32m+[m
+[32m+[m[32mAnswer naturally and conversationally.[m
+[32m+[m
+[32m+[m[32mKeep replies short (under 120 words).[m
+[32m+[m
+[32m+[m[32mUser:[m
+[32m+[m[32m{question}[m
+[32m+[m[32m"""[m
+[32m+[m
+[32m+[m[32m    response = model.generate_content(prompt)[m
+[32m+[m[32m    return response.text[m
+[32m+[m
+[32m+[m
+[32m+[m[32mdef ask_gemini(question: str, context: str):[m
+[32m+[m[32m    prompt = f"""[m
+[32m+[m[32mYou are DocMind AI.[m
+[32m+[m
+[32m+[m[32mAnswer ONLY using the document context below.[m
+[32m+[m
+[32m+[m[32mIf the answer is not available in the document, politely reply:[m
+[32m+[m
+[32m+[m[32m"I couldn't find that information in the uploaded document."[m
+[32m+[m
+[32m+[m[32mDocument Context:[m
+ {context}[m
+ [m
+ Question:[m
+[36m@@ -29,5 +89,4 @@[m [mAnswer:[m
+ """[m
+ [m
+     response = model.generate_content(prompt)[m
+[31m-[m
+     return response.text[m
+\ No newline at end of file[m

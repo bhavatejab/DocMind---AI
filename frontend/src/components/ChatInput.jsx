@@ -19,7 +19,7 @@ function ChatInput({ onSend, loading, disabled }) {
 
     const trimmed = message.trim();
 
-    if (!trimmed || loading || disabled) return;
+    if (!trimmed || loading) return;
 
     onSend(trimmed);
     setMessage("");
